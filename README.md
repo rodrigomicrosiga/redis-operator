@@ -59,16 +59,16 @@ graph TD
   * Escolha da topologia Sentinel focada no aprofundamento do tratamento de `StatefulSets` e *Leader Election* manual.
   * Elaboração do manifesto do projeto (ADR) e mapeamento visual em Mermaid.
 
-* **[08/06/2026] - Construção do Núcleo Stateful (Master/Replica):**
+* **[08/06/2026] - Construção do Núcleo Stateful e Inteligência de Failover:**
   * Criei o design pattern `Factory` (`factory.go`) para isolar a lógica de geração dos recursos físicos.
-  * Implementei a criação do `Headless Service` para garantir a identidade DNS fixa de cada nó na rede interna do cluster.
-  * Desenvolvi um `ConfigMap` com um script de *bootstrap* inteligente: ao nascer, o Pod avalia seu próprio `hostname`. Se for o sufixo `-0`, ele assume como Master; caso contrário, nasce como Replica e aponta automaticamente para o Master.
-  * Orquestrei o `StatefulSet` no loop de reconciliação para garantir a criação sequencial e controlada dos nós do Redis.
+  * Implementei o `Headless Service` para garantir a identidade DNS fixa de cada nó do banco.
+  * Desenvolvi a lógica dos Vigias (Sentinels) via `Deployment`, calculando o quórum de votos dinamicamente com base nas especificações do CRD.
+  * Orquestrei o loop completo de reconciliação no controlador para atualizar o status do CRD para `Ready` de forma automatizada.
 
-* **[08/06/2026] - Inteligência de Failover e Deploy:**
-  * Implementei a criação dinâmica dos Vigias (Sentinels) através de um `Deployment`, calculando o quórum necessário matematicamente com base no tamanho do cluster.
-  * O Sentinel reescreve suas próprias configurações em tempo de execução em um volume temporário para rastrear a eleição do Master.
-  * Concluí a inteligência do Controlador atualizando o `Status` do CRD para `Ready` de forma autônoma após o provisionamento completo da infraestrutura.
-  * Validei o loop de reconciliação em ambiente local isolado utilizando o Kustomize e o Tilt. O cluster subiu perfeitamente com os nós se reconhecendo via Headless Service.
+* **[08/06/2026] - Resiliência POSIX e Validação em Ambiente Local (Tilt):**
+  * **Troubleshooting:** Identifiquei e corrigi um comportamento específico do `grep` do BusyBox/Alpine que forçava o nó Master a entrar em `CrashLoopBackOff`.
+  * **Solução:** Substituí a validação do hostname por uma estrutura `case` nativa POSIX Shell, tornando o script de inicialização do container 100% agnóstico e imune a variações de ferramentas do sistema operacional.
+  * Corrigi o mapeamento do arquivo de configuração do Redis para o diretório correto de montagem do volume (`/config/redis.conf`).
+  * Validei com sucesso a subida simultânea e ordenada de toda a infraestrutura: 1 Master, 2 Replicas e 3 Sentinels em perfeita harmonia.
 
 </details>
