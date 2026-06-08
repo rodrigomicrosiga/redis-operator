@@ -1,0 +1,80 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: redisclusters.cache.cloud104.io
+spec:
+  group: cache.cloud104.io
+  names:
+    kind: RedisCluster
+    listKind: RedisClusterList
+    plural: redisclusters
+    singular: rediscluster
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RedisCluster is the Schema for the redisclusters API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of RedisCluster
+            properties:
+              redisImage:
+                default: redis:7.0-alpine
+                description: RedisImage permite customizar a versão da imagem do Redis
+                type: string
+              sentinelSize:
+                description: 'SentinelSize define a quantidade de nós do Sentinel
+                  para o quórum. Padrão recomendado: 3'
+                format: int32
+                minimum: 3
+                type: integer
+              size:
+                description: 'Size define a quantidade de nós Redis (1 Master + N
+                  Replicas). Padrão recomendado: 3'
+                format: int32
+                minimum: 1
+                type: integer
+            required:
+            - sentinelSize
+            - size
+            type: object
+          status:
+            description: status defines the observed state of RedisCluster
+            properties:
+              masterNode:
+                description: MasterNode guarda o nome do pod que atualmente é o Master
+                  (útil para debug e roteamento)
+                type: string
+              phase:
+                description: 'Phase representa o status atual do cluster (ex: Creating,
+                  Ready, Degraded)'
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

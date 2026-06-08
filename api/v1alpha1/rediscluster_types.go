@@ -25,37 +25,26 @@ import (
 
 // RedisClusterSpec defines the desired state of RedisCluster
 type RedisClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
+	// Size define a quantidade de nós Redis (1 Master + N Replicas). Padrão recomendado: 3
+	// +kubebuilder:validation:Minimum=1
+	Size int32 `json:"size"`
 
-	// foo is an example field of RedisCluster. Edit rediscluster_types.go to remove/update
-	// +optional
-	Foo *string `json:"foo,omitempty"`
+	// SentinelSize define a quantidade de nós do Sentinel para o quórum. Padrão recomendado: 3
+	// +kubebuilder:validation:Minimum=3
+	SentinelSize int32 `json:"sentinelSize"`
+
+	// RedisImage permite customizar a versão da imagem do Redis
+	// +kubebuilder:default:="redis:7.0-alpine"
+	RedisImage string `json:"redisImage,omitempty"`
 }
 
-// RedisClusterStatus defines the observed state of RedisCluster.
+// RedisClusterStatus defines the observed state of RedisCluster
 type RedisClusterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Phase representa o status atual do cluster (ex: Creating, Ready, Degraded)
+	Phase string `json:"phase,omitempty"`
 
-	// For Kubernetes API conventions, see:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
-
-	// conditions represent the current state of the RedisCluster resource.
-	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
-	//
-	// Standard condition types include:
-	// - "Available": the resource is fully functional
-	// - "Progressing": the resource is being created or updated
-	// - "Degraded": the resource failed to reach or maintain its desired state
-	//
-	// The status of each condition is one of True, False, or Unknown.
-	// +listType=map
-	// +listMapKey=type
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// MasterNode guarda o nome do pod que atualmente é o Master (útil para debug e roteamento)
+	MasterNode string `json:"masterNode,omitempty"`
 }
 
 // +kubebuilder:object:root=true
