@@ -50,12 +50,19 @@ graph TD
 ```
 ## 📖 Diário de Desenvolvimento
 
+<details open>
+<summary><strong>Clique para expandir o registro das atividades</strong></summary>
+
 * **[08/06/2026] - Setup Inicial e Decisão Arquitetural:**
-
-  * Inicialização do módulo Go e scaffolding do Kubebuilder (cloud104.io/v1alpha1).
-
+  * Inicialização do módulo Go e scaffolding do Kubebuilder (`cloud104.io/v1alpha1`).
   * Estudo comparativo arquitetural: Redis Sentinel vs. Redis Cluster.
-
-  * Escolha da topologia Sentinel focada no aprofundamento do tratamento de StatefulSets e Leader Election manual.
-
+  * Escolha da topologia Sentinel focada no aprofundamento do tratamento de `StatefulSets` e *Leader Election* manual.
   * Elaboração do manifesto do projeto (ADR) e mapeamento visual em Mermaid.
+
+* **[08/06/2026] - Construção do Núcleo Stateful (Master/Replica):**
+  * Criei o design pattern `Factory` (`factory.go`) para isolar a lógica de geração dos recursos físicos.
+  * Implementei a criação do `Headless Service` para garantir a identidade DNS fixa de cada nó na rede interna do cluster.
+  * Desenvolvi um `ConfigMap` com um script de *bootstrap* inteligente: ao nascer, o Pod avalia seu próprio `hostname`. Se for o sufixo `-0`, ele assume como Master; caso contrário, nasce como Replica e aponta automaticamente para o Master.
+  * Orquestrei o `StatefulSet` no loop de reconciliação para garantir a criação sequencial e controlada dos nós do Redis.
+
+</details>
