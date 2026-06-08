@@ -65,14 +65,17 @@ func buildConfigMap(cluster *cachev1alpha1.RedisCluster, scheme *runtime.Scheme)
 	setupScript := `#!/bin/sh
 echo "Iniciando bootstrap do nó: $HOSTNAME"
 
-if echo "$HOSTNAME" | grep -q "-0$"; then
-  echo "=> Assumindo papel de MASTER"
-  redis-server /etc/redis/redis.conf
-else
-  echo "=> Assumindo papel de REPLICA"
-  echo "=> Conectando ao Master: ` + masterFQDN + `"
-  redis-server /etc/redis/redis.conf --replicaof ` + masterFQDN + ` 6379
-fi
+case "$HOSTNAME" in
+  *-0)
+    echo "=> Assumindo papel de MASTER"
+    redis-server /config/redis.conf
+    ;;
+  *)
+    echo "=> Assumindo papel de REPLICA"
+    echo "=> Conectando ao Master: ` + masterFQDN + `"
+    redis-server /config/redis.conf --replicaof ` + masterFQDN + ` 6379
+    ;;
+esac
 `
 
 	cm := &corev1.ConfigMap{
