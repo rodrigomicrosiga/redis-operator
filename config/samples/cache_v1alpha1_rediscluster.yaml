@@ -1,9 +1,11 @@
 apiVersion: cache.cloud104.io/v1alpha1
 kind: RedisCluster
 metadata:
+  name: cache-producao
   labels:
-    app.kubernetes.io/name: redis-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: rediscluster-sample
+    app.kubernetes.io/name: rediscluster
+    app.kubernetes.io/managed-by: redis-operator
 spec:
-  # TODO(user): Add fields here
+  size: 3
+  sentinelSize: 3
+  redisImage: "redis:7.0-alpine"

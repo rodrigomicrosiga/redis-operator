@@ -145,10 +145,62 @@ func (r *RedisClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Error(err, "Falha ao buscar o StatefulSet")
 		return ctrl.Result{}, err
 	}
+	// ========================================================================
 	// Passo 4: Garantir o Deployment do Sentinel (O Quórum de HA)
-	// Passo 5: Atualizar o Status do CRD
+	// ========================================================================
 
+	// 4.1 - ConfigMap do Sentinel
+	sentinelCm, err := buildSentinelConfigMap(redisCluster, r.Scheme)
+	if err != nil {
+		log.Error(err, "Falha ao construir ConfigMap do Sentinel")
+		return ctrl.Result{}, err
+	}
+	foundSentCm := &corev1.ConfigMap{}
+	err = r.Get(ctx, types.NamespacedName{Name: sentinelCm.Name, Namespace: sentinelCm.Namespace}, foundSentCm)
+	if err != nil && apierrors.IsNotFound(err) {
+		log.Info("Criando ConfigMap do Sentinel", "Namespace", sentinelCm.Namespace, "Name", sentinelCm.Name)
+		err = r.Create(ctx, sentinelCm)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// 4.2 - Deployment do Sentinel
+	sentinelDep, err := buildSentinelDeployment(redisCluster, r.Scheme)
+	if err != nil {
+		log.Error(err, "Falha ao construir Deployment do Sentinel")
+		return ctrl.Result{}, err
+	}
+	foundSentDep := &appsv1.Deployment{}
+	err = r.Get(ctx, types.NamespacedName{Name: sentinelDep.Name, Namespace: sentinelDep.Namespace}, foundSentDep)
+	if err != nil && apierrors.IsNotFound(err) {
+		log.Info("Criando Deployment do Sentinel", "Namespace", sentinelDep.Namespace, "Name", sentinelDep.Name)
+		err = r.Create(ctx, sentinelDep)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+	// ========================================================================
+	// Passo 5: Atualizar o Status do CRD
+	// ========================================================================
+	// Se o código chegou até aqui sem retornar erros, significa que todos os
+	// recursos (Service, ConfigMaps, StatefulSet e Deployment) existem.
+	if redisCluster.Status.Phase != "Ready" {
+		redisCluster.Status.Phase = "Ready"
+		err := r.Status().Update(ctx, redisCluster)
+		if err != nil {
+			log.Error(err, "Falha ao atualizar o status do RedisCluster")
+			return ctrl.Result{}, err
+		}
+		log.Info("Cluster Redis Sentinel provisionado com sucesso! Status atualizado para Ready.")
+	}
+
+	// Loop finalizado com sucesso. O K8s só chamará o Reconcile novamente se
+	// algo for alterado ou deletado.
 	return ctrl.Result{}, nil
+
 }
 
 // SetupWithManager sets up the controller with the Manager.

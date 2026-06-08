@@ -65,4 +65,10 @@ graph TD
   * Desenvolvi um `ConfigMap` com um script de *bootstrap* inteligente: ao nascer, o Pod avalia seu próprio `hostname`. Se for o sufixo `-0`, ele assume como Master; caso contrário, nasce como Replica e aponta automaticamente para o Master.
   * Orquestrei o `StatefulSet` no loop de reconciliação para garantir a criação sequencial e controlada dos nós do Redis.
 
+* **[08/06/2026] - Inteligência de Failover e Deploy:**
+  * Implementei a criação dinâmica dos Vigias (Sentinels) através de um `Deployment`, calculando o quórum necessário matematicamente com base no tamanho do cluster.
+  * O Sentinel reescreve suas próprias configurações em tempo de execução em um volume temporário para rastrear a eleição do Master.
+  * Concluí a inteligência do Controlador atualizando o `Status` do CRD para `Ready` de forma autônoma após o provisionamento completo da infraestrutura.
+  * Validei o loop de reconciliação em ambiente local isolado utilizando o Kustomize e o Tilt. O cluster subiu perfeitamente com os nós se reconhecendo via Headless Service.
+
 </details>

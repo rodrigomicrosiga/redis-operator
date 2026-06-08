@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -180,4 +182,134 @@ func buildStatefulSet(cluster *cachev1alpha1.RedisCluster, scheme *runtime.Schem
 	}
 
 	return sts, nil
+}
+
+// buildSentinelConfigMap cria o script de inicialização dos vigias (Sentinels)
+func buildSentinelConfigMap(cluster *cachev1alpha1.RedisCluster, scheme *runtime.Scheme) (*corev1.ConfigMap, error) {
+	labels := labelsForRedis(cluster.Name)
+	labels["role"] = "sentinel"
+	cmName := cluster.Name + "-sentinel-config"
+
+	masterFQDN := cluster.Name + "-0." + cluster.Name + "-headless." + cluster.Namespace + ".svc.cluster.local"
+
+	// O Quórum é a maioria absoluta. Ex: Se temos 3 sentinels, precisamos de 2 votos para promover um Master.
+	quorum := (cluster.Spec.SentinelSize / 2) + 1
+
+	// O Sentinel reescreve o próprio arquivo de configuração em tempo de execução.
+	// Por isso, copiamos o arquivo do ConfigMap (ReadOnly) para uma pasta gravável (/data) antes de iniciar.
+	setupScript := `#!/bin/sh
+echo "Iniciando Sentinel..."
+cp /config/sentinel.conf /data/sentinel.conf
+chmod 777 /data/sentinel.conf
+
+echo "sentinel monitor mymaster ` + masterFQDN + ` 6379 ` + fmt.Sprint(quorum) + `" >> /data/sentinel.conf
+echo "sentinel down-after-milliseconds mymaster 5000" >> /data/sentinel.conf
+echo "sentinel failover-timeout mymaster 60000" >> /data/sentinel.conf
+echo "sentinel resolve-hostnames yes" >> /data/sentinel.conf
+echo "sentinel announce-hostnames yes" >> /data/sentinel.conf
+
+redis-sentinel /data/sentinel.conf
+`
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: cluster.Namespace,
+			Labels:    labels,
+		},
+		Data: map[string]string{
+			"sentinel.conf": "port 26379\n",
+			"setup.sh":      setupScript,
+		},
+	}
+
+	if err := ctrl.SetControllerReference(cluster, cm, scheme); err != nil {
+		return nil, err
+	}
+
+	return cm, nil
+}
+
+// buildSentinelDeployment cria os pods dos vigias baseados no tamanho exigido
+func buildSentinelDeployment(cluster *cachev1alpha1.RedisCluster, scheme *runtime.Scheme) (*appsv1.Deployment, error) {
+	labels := labelsForRedis(cluster.Name)
+	labels["role"] = "sentinel"
+	depName := cluster.Name + "-sentinel"
+	replicas := cluster.Spec.SentinelSize
+
+	image := cluster.Spec.RedisImage
+	if image == "" {
+		image = "redis:7.0-alpine"
+	}
+	mode := int32(0777)
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      depName,
+			Namespace: cluster.Namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "sentinel",
+							Image:   image,
+							Command: []string{"/bin/sh", "/config/setup.sh"},
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "sentinel",
+									ContainerPort: 26379,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config-volume",
+									MountPath: "/config",
+								},
+								{
+									// Pasta onde o Sentinel terá permissão para reescrever suas configs de estado
+									Name:      "data-volume",
+									MountPath: "/data",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config-volume",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: cluster.Name + "-sentinel-config",
+									},
+									DefaultMode: &mode,
+								},
+							},
+						},
+						{
+							Name: "data-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(cluster, dep, scheme); err != nil {
+		return nil, err
+	}
+
+	return dep, nil
 }
